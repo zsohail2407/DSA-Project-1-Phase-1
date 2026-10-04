@@ -46,25 +46,48 @@ public:
     // Implement these functions:
     Stack()
     { // initialize the stack
+      top=nullptr;
+      count=0;
     }
     void push(const T &val)
     {
-
+        if(count<MAX_STACK_DEPTH)
+        {
+      Node*temp=new Node;
+      temp->data=val;
+      temp->next=top;
+      top=temp;
+      count++;
+        }
         // pushes the value on the stack if max limit is not reached yet.
     }
     T pop()
     {
+        if (isEmpty())
+        {
+            return;
+        }
+      Node* temp=top;
+      T v=temp->data;
+      top=top->next;
+      delete temp;
+      count--;
+      return v;
+      
         // pop the top value on the stack
     }
     T &peek()
     {
+        return top->data;
         // returns the top value on the stack
     }
     bool isEmpty()
     {
+        return count==0;
     }
     int32_t depth()
     {
+        return count;
     }
     int32_t snapshot_into(T out[], int32_t maxLen)
     {
@@ -257,7 +280,5 @@ int32_t main()
     writeTdbg(timeline, "session.tdbg");
 
     return 0;
-}^T^Z
-
-^T^Z
+}
 
