@@ -63,10 +63,6 @@ public:
     }
     T pop()
     {
-        if (isEmpty())
-        {
-            return;
-        }
       Node* temp=top;
       T v=temp->data;
       top=top->next;
@@ -105,6 +101,8 @@ struct TimelineNode
     TimelineNode *next;
     TimelineNode *prev;
 };
+
+
 class Timeline
 {
     TimelineNode *head, *tail;
@@ -114,16 +112,36 @@ public:
     // Implement these functions
     Timeline()
     {
+        head=nullptr;
+        tail=nullptr;
+        stepCount=0;
     }
     void record(Snapshot *s)
     {
+        TimelineNode* temp=new TimelineNode;
+        temp->data=s;
+        temp->next=nullptr;
+        temp->prev=tail;
+        if(head==nullptr)
+        {
+           head=temp;
+        }
+        else
+        {
+           // TimelineNode* t2=tail;
+            tail->next=temp;
+        }
+            tail=temp;
+            stepCount++;
         // add record in the timeline
     }
     TimelineNode *begin()
     {
+        return head;
     }
     int32_t getStepCount()
     {
+        return stepCount;
     }
 };
 
@@ -147,6 +165,7 @@ struct Snapshot
     Frame callStack[MAX_STACK_DEPTH];
     int32_t stackDepth;
 };
+
 struct TTDBHeader
 {
     char magic[4]; // "TTDB"
