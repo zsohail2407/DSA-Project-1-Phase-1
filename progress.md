@@ -3,3 +3,4 @@
 2-Oct-2026: still doing that setup
 3-Oct-2026: it is currently 1:11 pm and linux keh setup keh baad say abhi project samajhnay ki koshish karrahi hun, about to properly start coding soon
 2) stack implementation done, about to implement its last snapshot into function and then moving on
+3) implemented timeline, understood the use of both ds cz bohat confusing kaam chal raha hai
