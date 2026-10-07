@@ -9,6 +9,7 @@
 
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <cstdint>
 #include <fstream>
@@ -87,6 +88,15 @@ public:
     }
     int32_t snapshot_into(T out[], int32_t maxLen)
     {
+        Node* temp=top;
+        int ct=0;
+        while (temp!=nullptr&& ct<maxLen)
+        {
+            out[ct]=temp->data;
+            temp=temp->next;
+            ct++;
+        }
+        return ct;
         // copies every frame, top to bottom in the array given as a parameter
         // this is what buildSnapshot() call, returns count written
     }
@@ -198,18 +208,75 @@ struct PendingPatch
 // PASS 0x0: READING source.bin + VALIDITY CHECK
 bool readSourceLine(ifstream &in, string &out)
 {
-    // reads the next nonblank line
+    string aaaa;
+    while(getline(in,aaaa))
+    {
+       stringstream aa(aaaa);
+       string word;
+       if(aa>>word)
+       {
+        out=aaaa;
+        return true;
+       }
+    }
+    return false;
 }
 string firstWord(const string &line)
 {
     // returns first word from the input string
+       stringstream aa(line);
+       string word;
+       if(aa>>word)
+       {
+        return word;
+       }
+       return "";
 }
 string secondWord(const string &line)
 {
+       stringstream aa(line);
+       string word1,word2;
+       if(aa>>word1>>word2)
+       {
+        return word2;
+       }
+       return "";
     // returns the second word
 }
 bool validateProgram(const char *sourcePath)
 {
+    ifstream file(sourcePath);
+    string aaaa;
+    bool check=false;
+      if(!file.is_open())
+      {
+        return false;
+      }
+    while(readSourceLine(file,aaaa))
+    {
+        //apnay liay: check tru repr. func and false repr. func end
+      string aa=firstWord(aaaa);
+      if(aa=="func")
+      {
+    if (check==true)
+    {
+        file.close();
+        return false;
+    }
+    check=true;
+      }
+      else if(aa=="func_end")
+      {
+    if (check==false)
+    {
+        file.close();
+        return false;
+    }
+    check=false;
+      }
+    }
+    file.close();
+    return !check;
     // for each func defined there should be exactly one func_end and no nested funcs allowed - 
 }
 
