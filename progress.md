@@ -6,3 +6,4 @@
 3) implemented timeline, understood the use of both ds cz bohat confusing kaam chal raha hai
 4)took a break, abh understanding all structs before any further implementation
 7-Oct-2026: almost done with multiple things, cz im doing easy things first, i completed snapshot into (i think), havent tested anything yet, and i did the basic readsourceline, firstline, secondline functions and im currently figuring out validate program wala function and then as soon as these are done i will push.
+Stage 1 is done
