@@ -283,11 +283,30 @@ bool validateProgram(const char *sourcePath)
 // PASS 0x1: RESOLVE() -> resolve.bin
 int64_t writeResolveRecord(FILE *f, int64_t offsetField, const string &text)
 {
+    int64_t start=ftell(f);
+    int32_t size=text.length();
+    fwrite(&offsetField,8,1,f);
+    fwrite(&size,4,1,f);
+    fwrite(&text[0],1,size,f);
     // writes one [offset(8B)][size(4B)][string] record at the current file position
     // returns this record's own starting byte position
+    return start;
 }
 int64_t readResolveRecord(FILE *f, string &outText)
 {
+    int64_t offsetField=0;
+    int32_t size=0;
+    if(fread(&offsetField,8,1,f)!=1)
+    {
+        return -1;
+    }
+    if(fread(&size,4,1,f)!=1)
+    {
+        return -1;
+    }
+    outText.resize(size);
+    fread(&outText[0],1,size,f);
+    return offsetField;
     // reads one record at the current position and advances past it, returns the offset field - the raw line text comes back untouched in outText.
 }
 int64_t resolveProgram(const char *sourcePath, const char *resolveBinPath)
@@ -296,6 +315,33 @@ int64_t resolveProgram(const char *sourcePath, const char *resolveBinPath)
     int32_t funcCount = 0;
     PendingPatch patches[MAX_PATCHES];
     int32_t patchCount = 0;
+
+    ifstream fin(sourcePath);
+    FILE* fout=fopen("resolve.bin","wb");
+    if(!fin.is_open())
+    {
+        return -1;
+    }
+    string aaaa;
+    while(readSourceLine(fin,aaaa))
+    {
+        string word=firstWord(aaaa);
+        int64_t position=ftell(fout);
+        if(word=="func")
+        {
+            funcArray[funcCount].funcName=secondWord(aaaa);
+            funcCount++;
+            writeResolveRecord(fout,position,line);
+        }
+        else if(word=="call")
+        {
+
+        }
+        else
+        {
+
+        }
+    }
     // Every source line becomes one record holding the raw line, as-is.
     // resolve() only PEEKS at the leading word(s) -- enough to spot FUNC
     // (remember its position) and CALL (remember which function it needs
