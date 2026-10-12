@@ -437,8 +437,133 @@ Snapshot *buildSnapshot(Stack<Frame> &callStack)
     return aaaaa;
     // build the snapshot based on the callStack given
 }
+void setValue(Frame &f, const string &n, int32_t v)
+{
+    for (int32_t i=0; i<f.localCount; i++)
+    {
+        if (f.locals[i].name==n)
+        {
+            f.locals[i].value=v;
+            return;
+        }
+    }
+    if (f.localCount<16)
+    {
+        f.locals[f.localCount].name = n;
+        f.locals[f.localCount].value = v;
+        f.localCount++;
+    }
+}
+int32_t getValue(const Frame &f, const string &token)
+{
+    if (isdigit(token[0])||(token[0]=='-'&& token.length()>1))
+    {
+        int value=0;
+        stringstream aa(token);
+        aa>>value;
+        return value;
+    }
+    for (int32_t i=0; i<f.localCount; i++)
+    {
+        if (f.locals[i].name == token)
+        {
+            return f.locals[i].value;
+        }
+    }
+    return 0;
+}
+
 void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &timeline)
 {
+    FILE *f= fopen(resolveBinPath, "rb");
+    if(!f)
+    {
+        return;
+    }
+    Stack<Frame> cs;
+    //initiliasing a1
+    Frame a1;
+    a1.func_name="main";
+    a1.argc= 0;
+    a1.localCount= 0;
+    a1.returnLine=-1;
+    cs.push(a1);
+    fseek(f,mainOffset,SEEK_SET);
+    string aaaa;
+    while(!cs.isEmpty())
+    {
+        int64_t targetOffset=readResolveRecord(f, aaaa);
+        if(targetOffset==-1)
+        {
+            break;
+        }
+        Token arr[MAX_TOKENS];
+        int32_t tokenNums=tokenizeLine(aaaa, arr, MAX_TOKENS);
+        if(tokenNums==0)
+        {
+            continue;
+        }
+        string key=arr[0].text;
+        Frame &currentFunction=cs.peek();
+        if (key=="func_end"||key=="return")
+        {
+            Frame old=cs.pop();
+            if(cs.isEmpty())
+            {
+            break;
+            }
+            fseek(f,old.returnLine,SEEK_SET);
+        }
+        else if(tokenNums>=3 && (key=="add"||key=="sub"||key=="mul"||key=="div"))
+        {
+            int32_t n1=getValue(currentFunction,arr[1].text);
+            int32_t n2 = getValue(currentFunction, arr[2].text);
+            int32_t res=0;
+        if (key=="mul")
+        {
+            res=n1*n2;
+        }
+        else if (key=="div")
+        {
+            if(n2==0)
+            {
+              fclose(f);
+              return;
+            }
+            else
+            {
+            res=n1/n2;
+            }
+        }
+        else if (key=="add")
+        {
+            res=n1+n2;
+        }
+        else if (key=="sub")
+        {
+            res=n1-n2;
+        }
+        setValue(currentFunction,arr[1].text,res);
+    }
+        else if (key=="set")
+        {
+            int32_t val=getValue(currentFunction,arr[2].text);
+            setValue(currentFunction, arr[1].text, val);
+        }
+    else if(key=="call" && tokenNums>=2)
+    {
+    Frame a2;
+    a2.func_name=arr[1].text;
+    a2.argc= 0;
+    a2.localCount= 0;
+    a2.returnLine=ftell(f);
+    cs.push(a2);
+    fseek(f,targetOffset,SEEK_SET);
+    }
+        timeline.record(buildSnapshot(cs, aaaa));
+    }
+    fclose(f);
+
     // initialize the call stack
     // make the main frame
     // push main frame on the call stack
