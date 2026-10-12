@@ -50,7 +50,16 @@ public:
       top=nullptr;
       count=0;
     }
-    void push(const T &val)
+    ~Stack()
+    {
+        while (top != nullptr)
+        {
+            Node *t=top;
+            top=top->next;
+            delete t;
+        }
+    }
+    bool push(const T &val)
     {
         if(count<MAX_STACK_DEPTH)
         {
@@ -59,11 +68,17 @@ public:
       temp->next=top;
       top=temp;
       count++;
+      return true;
         }
+        return false;
         // pushes the value on the stack if max limit is not reached yet.
     }
     T pop()
     {
+        if (top==nullptr)
+        {
+            return T();
+        }
       Node* temp=top;
       T v=temp->data;
       top=top->next;
@@ -187,7 +202,8 @@ void writeHeader(FILE *f, const TTDBHeader &h)
 {
     fwrite(h.magic, 1, 4, f);
     fwrite(&h.version, sizeof(int32_t), 1, f);
-
+    fwrite(&h.stepCount, sizeof(int32_t), 1, f);
+    fwrite(&h.indexOffset, sizeof(int64_t), 1, f);
     // placeholder for other two data members
 }
 
@@ -321,6 +337,10 @@ int64_t resolveProgram(const char *sourcePath, const char *resolveBinPath)
     FILE* fout=fopen(resolveBinPath,"wb");
     if(!fin.is_open()|| fout==NULL)
     {
+        if(fout) 
+        {
+            fclose(fout);
+        }
         return -1;
     }
     string aaaa;
@@ -439,6 +459,14 @@ Snapshot *buildSnapshot(Stack<Frame> &callStack)
 }
 void setValue(Frame &f, const string &n, int32_t v)
 {
+    for (int32_t i=0; i<f.argc; i++)
+    {
+        if (f.argv[i].name==n)
+        {
+            f.argv[i].value=v;
+            return;
+        }
+    }
     for (int32_t i=0; i<f.localCount; i++)
     {
         if (f.locals[i].name==n)
@@ -456,12 +484,19 @@ void setValue(Frame &f, const string &n, int32_t v)
 }
 int32_t getValue(const Frame &f, const string &token)
 {
-    if (isdigit(token[0])||(token[0]=='-'&& token.length()>1))
+    if ((token[0]>='0' && token[0]<='9')||(token[0]=='-'&& token.length()>1))
     {
         int value=0;
         stringstream aa(token);
         aa>>value;
         return value;
+    }
+    for (int32_t i=0; i<f.argc; i++)
+    {
+        if (f.argv[i].name == token)
+        {
+            return f.argv[i].value;
+        }
     }
     for (int32_t i=0; i<f.localCount; i++)
     {
@@ -472,7 +507,7 @@ int32_t getValue(const Frame &f, const string &token)
     }
     return 0;
 }
-
+  bool check = false;
 void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &timeline)
 {
     FILE *f= fopen(resolveBinPath, "rb");
@@ -481,6 +516,7 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
         return;
     }
     Stack<Frame> cs;
+    string refs[MAX_STACK_DEPTH][MAX_VARS_PER_FRAME];
     //initiliasing a1
     Frame a1;
     a1.func_name="main";
@@ -507,10 +543,20 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
         Frame &currentFunction=cs.peek();
         if (key=="func_end"||key=="return")
         {
+            int32_t d=cs.depth();
             Frame old=cs.pop();
             if(cs.isEmpty())
             {
-            break;
+                break;
+            }
+            Frame &a=cs.peek();
+            for(int32_t i=0;i<old.argc;i++)
+            {
+                const string &str=refs[d-1][i];
+                if(!str.empty() && !(str[0]>='0' && str[0]<='9') && str[0]!='-')
+                {
+                    setValue(a,str,old.argv[i].value);
+                }
             }
             fseek(f,old.returnLine,SEEK_SET);
         }
@@ -527,6 +573,7 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
         {
             if(n2==0)
             {
+              check=true;
               fclose(f);
               return;
             }
@@ -552,15 +599,41 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
         }
     else if(key=="call" && tokenNums>=2)
     {
-    Frame a2;
-    a2.func_name=arr[1].text;
-    a2.argc= 0;
-    a2.localCount= 0;
-    a2.returnLine=ftell(f);
-    cs.push(a2);
-    fseek(f,targetOffset,SEEK_SET);
+        int32_t ret=ftell(f);
+        Frame a2;
+        a2.func_name=arr[1].text;
+        a2.argc=tokenNums-2;
+        a2.localCount=0;
+        a2.returnLine=ret;
+
+        string funcLine;
+        fseek(f,targetOffset,SEEK_SET);
+        readResolveRecord(f,funcLine);
+        Token ft[MAX_TOKENS];
+        int32_t fn=tokenizeLine(funcLine,ft,MAX_TOKENS);
+        if(fn!=tokenNums)
+        {
+            check=true;
+            fclose(f);
+            return;
+        }
+        for(int32_t i=0;i<a2.argc;i++)
+        {
+            a2.argv[i].name=ft[i+2].text;
+            a2.argv[i].value=getValue(currentFunction,arr[i+2].text);
+        }
+        if(!cs.push(a2))
+        {
+            check=true;
+            fclose(f);
+            return;
+        }
+        for(int32_t i=0;i<a2.argc;i++)
+        {
+            refs[cs.depth()-1][i]=arr[i+2].text;
+        }
     }
-        timeline.record(buildSnapshot(cs, aaaa));
+        timeline.record(buildSnapshot(cs));
     }
     fclose(f);
 
@@ -572,9 +645,63 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
     // execute line by line, and according to the keyword perform action
 }
 
+
 // PASS 0x3: SERIALIZE TIMELINE
+
+void writeString(FILE *f, const string &str)
+{
+    int32_t length = str.length();
+    fwrite(&length, 4, 1, f);
+    if (length > 0)
+    {
+        fwrite(&str[0], 1, length, f);
+    }
+}
 void writeTdbg(Timeline &timeline, const char *tdbgPath)
 {
+    FILE *f = fopen(tdbgPath, "wb");
+    if (!f)
+    {
+        return;
+    }
+    int32_t ct = timeline.getStepCount();
+    TTDBHeader h = {{'T','T','D','B'}, 1, ct, 0};
+    writeHeader(f, h);
+    int64_t *offsets = new int64_t[ct];
+    TimelineNode *n = timeline.begin();
+
+    for (int32_t i=0; i<ct && n!=nullptr; i++,n=n->next)
+    {
+        offsets[i] = ftell(f);
+        Snapshot *snap = n->data;
+        fwrite(&snap->stackDepth, 4, 1, f);
+
+        for (int32_t j=0; j<snap->stackDepth; j++)
+        {
+            Frame frame = snap->callStack[j];
+            writeString(f, frame.func_name);
+            fwrite(&frame.argc, 4, 1, f);
+
+            for (int32_t k=0; k<frame.argc; k++)
+            {
+                writeString(f, frame.argv[k].name);
+                fwrite(&frame.argv[k].value, 4, 1, f);
+            }
+            fwrite(&frame.returnLine, 4, 1, f);
+            fwrite(&frame.localCount, 4, 1, f);
+            for (int32_t k=0;k<frame.localCount; k++)
+            {
+                writeString(f, frame.locals[k].name);
+                fwrite(&frame.locals[k].value, 4, 1, f);
+            }
+        }
+    }
+    h.indexOffset =ftell(f);
+    fwrite(offsets, 8, ct, f);
+    fseek(f, 12, SEEK_SET);
+    fwrite(&h.indexOffset, 8, 1, f);
+    delete[] offsets;
+    fclose(f);
     // placeholder for header
     // index array of the size of stepcount from the timeline
     // placing each snapshot in the file while maintaining the index(starting point of each nth snapshot)
@@ -587,7 +714,7 @@ int32_t main()
 
     if (!validateProgram("source.bin"))
     {
-        // send an error response instead of a .tdbg file
+        cout<<"Error!"<<endl;
         return 1;
     }
 
@@ -600,5 +727,3 @@ int32_t main()
 
     return 0;
 }
-
-
