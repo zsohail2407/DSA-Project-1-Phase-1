@@ -10,3 +10,5 @@ Stage 1 is done
 9-Oct-2026: ive almost completed stage 2, ive learned functionalities like ftell, fseek and fwrite to be able to deal with binary files, im only left with resolve program from stage 2, cz its a bit complex so its taking some time
 Now completed woh function, excluding error messages, end par dekhun gi agar time hua toh karlun gi, and tokenise and snapshot wala hogayaa
 Completed stage 3, like pehlay mostly kar li thi kal but errors thay and execute program fully nahi implement kiya tha. abh kardiya and push bhi. Now working on stage 4 
+after stage 4 errors waghaira theek kiyay and logic fix ki
+4 bajnay waalay hain, project complete karliya hai, Goodnight, Allah hafiz!
